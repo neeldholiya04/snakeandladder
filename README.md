@@ -80,7 +80,7 @@ The game follows a modular, object-oriented architecture with clear separation o
 ### Option 1: Clone and Build
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/snake-ladder-game.git
+git clone https://github.com/neeldholiya04/snakeandladder.git
 cd snake-ladder-game
 
 # Compile the project

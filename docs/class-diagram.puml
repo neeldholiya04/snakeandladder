@@ -1,143 +1,136 @@
 @startuml SnakeAndLadderClassDiagram
+skinparam style strictuml
 skinparam classAttributeIconSize 0
-skinparam packageStyle rectangle
-skinparam shadowing false
-skinparam classFontColor #1f2937
-skinparam classBorderColor #374151
-skinparam classBackgroundColor #ffffff
-skinparam ArrowColor #374151
+skinparam PackageStyle rectangle
+hide circle
 
 package "org.example" {
-  class Main {
-    +main(args: String[]): void
-  }
+  class Main
 }
 
 package "org.example.engine" {
   class GameEngine {
-    -scanner: java.util.Scanner
-    +start(): void
-    ..game loop..
-    -askInt(prompt: String, min: int, max: int): int
-    -runGame(board: Board, diceSet: DiceSet, players: java.util.List<Player>): void
-    -handlePlayerTurn(current: Player, diceSet: DiceSet): int
-    -handleBotTurn(player: BotPlayer, diceSet: DiceSet): int
-    -handleHumanTurn(player: HumanPlayer, diceSet: DiceSet): int
-    -waitForEnterKey(): void
+    - static GameEngine instance
+    - Scanner scanner
+    - boolean running
+    + static GameEngine getInstance()
+    + void start()
+    + void play()
   }
 }
 
 package "org.example.board" {
-  class Board {
-    -instance: Board
-    -n: int
-    -size: int
-    -lastCell: int
-    -jumps: java.util.Map<Integer, IJump>
-    -players: java.util.List<org.example.player.Player>
-    -rand: java.util.Random
-    -Board(n: int, players: java.util.List<Player>)
-    +getInstance(n: int, players: java.util.List<Player>): Board
-    -generateRandomJumps(): void
-    +movePlayer(player: org.example.player.Player, roll: int): int
-    +printBoard(): void
-    +getLastCell(): int
-  }
-
   interface IJump {
-    +from(): int
-    +to(): int
-    +isSnake(): boolean
+    + int getFrom()
+    + int getTo()
   }
-
+  class Board {
+    - static Board instance
+    - int size
+    - Map<Integer, IJump> jumps
+    - List<org.example.player.Player> players
+    + static Board getInstance(int size)
+    + int getSize()
+    + void addJump(IJump)
+    + int applyJumpIfAny(int position)
+    + void print()
+  }
   class Snake implements IJump {
-    -head: int
-    -tail: int
-    +from(): int
-    +to(): int
-    +isSnake(): boolean
+    - int from
+    - int to
   }
-
   class Ladder implements IJump {
-    -start: int
-    -end: int
-    +from(): int
-    +to(): int
-    +isSnake(): boolean
+    - int from
+    - int to
   }
 }
 
 package "org.example.dice" {
   class Dice {
-    -FACES: int = 6 {static}
-    -rand: java.util.Random
-    +roll(): int
+    + int roll()
   }
-
   class DiceSet {
-    -instance: DiceSet
-    -dice: java.util.List<Dice>
-    -DiceSet(count: int)
-    +getInstance(count: int): DiceSet
-    +roll(): int
+    - List<Dice> dice
+    + int roll()
+    + static DiceSet getInstance(int count)
   }
 }
 
 package "org.example.player" {
   abstract class Player {
-    -id: String
-    -name: String
-    -position: int
-    +Player(id: String, name: String)
-    +getId(): String
-    +getName(): String
-    +getPosition(): int
-    +setPosition(pos: int): void
-    +takeTurn(diceSet: org.example.dice.DiceSet): int
+    - String id
+    - String name
+    - int position
+    + String getShortId()
+    + void move(int steps)
+    + boolean isHuman()
   }
-
   class HumanPlayer extends Player {
-    +HumanPlayer(id: String, name: String)
-    +takeTurn(diceSet: org.example.dice.DiceSet): int
+    + boolean isHuman()
   }
-
   class BotPlayer extends Player {
-    +BotPlayer(id: String, name: String)
-    +takeTurn(diceSet: org.example.dice.DiceSet): int
+    + boolean isHuman()
   }
 }
 
+package "org.example.rules" {
+  enum RuleType
+  class RuleResult {
+    + boolean allowed
+    + int newPosition
+    + String message
+  }
+  class RuleContext {
+    + org.example.player.Player player
+    + int rollSum
+    + int currentPosition
+    + int boardSize
+  }
+  interface IRule {
+    + RuleType getType()
+    + RuleResult apply(RuleContext ctx)
+  }
+  abstract class BaseRule implements IRule {
+    + RuleType type
+  }
+  class RuleManager {
+    - List<IRule> rules
+    + void addRule(IRule)
+    + RuleResult evaluate(RuleContext)
+  }
+  class RuleConfigurator {
+    + static RuleManager defaultRules()
+  }
+}
+
+package "org.example.rules.defaults" {
+  class StandardStartRule extends org.example.rules.BaseRule
+  class ExactLandingRule extends org.example.rules.BaseRule
+  class StandardWinningRule extends org.example.rules.BaseRule
+  class KillRule extends org.example.rules.BaseRule
+  class DoubleSixRule extends org.example.rules.BaseRule
+}
+
 ' Relationships
-Main --> GameEngine : uses
-GameEngine ..> Board : uses
-GameEngine ..> DiceSet : uses
-GameEngine ..> Player : creates/uses
-GameEngine ..> HumanPlayer
-GameEngine ..> BotPlayer
-
-Board o--> "players" Player : holds
-Board o--> IJump : has many (jumps)
-Board ..> Snake
-Board ..> Ladder
-Board --> "move" Player : movePlayer()
-
-DiceSet o--> "dice" Dice : contains many
-Player ..> DiceSet : takeTurn()
-
+Main --> GameEngine : starts
+GameEngine --> Board : uses
+GameEngine --> DiceSet : uses
+GameEngine --> RuleManager : uses
+GameEngine --> Player : manages turns
+Board o-- IJump : owns
+Board --> Player : positions of
 Snake ..|> IJump
 Ladder ..|> IJump
-
-HumanPlayer --|> Player
-BotPlayer --|> Player
-
-note right of Board
-  Singleton via static instance
-  getInstance(n, players)
-end note
-
-note right of DiceSet
-  Singleton via static instance
-  getInstance(count)
-end note
+DiceSet *-- Dice : contains
+Player <|-- HumanPlayer
+Player <|-- BotPlayer
+RuleManager o-- IRule : applies
+IRule <|-- BaseRule
+BaseRule <|-- StandardStartRule
+BaseRule <|-- ExactLandingRule
+BaseRule <|-- StandardWinningRule
+BaseRule <|-- KillRule
+BaseRule <|-- DoubleSixRule
+RuleConfigurator --> RuleManager : builds
 
 @enduml
